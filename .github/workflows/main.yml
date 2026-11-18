@@ -1,0 +1,58 @@
+name: jd cloud pc
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Iniciando jd cloud pc...
+    runs-on: windows-latest
+    timeout-minutes: 360  # Nota: O limite máximo padrão do GitHub Actions para runners gratuitos é de 360 minutos (6 horas)
+
+    steps:
+      - name: Baixando e Instalando Essenciais
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          Write-Host "Baixando script de instalação..."
+          Invoke-WebRequest -Uri "https://www.dropbox.com/scl/fi/7eiczvgil84czu55dxep3/Downloads.bat?rlkey=wzdc1wxjsph2b7r0atplmdz3p&dl=1" -OutFile "Downloads.bat"
+          
+          Write-Host "Executando Downloads.bat..."
+          Start-Process -FilePath "cmd.exe" -ArgumentList "/c Downloads.bat" -Wait
+
+      - name: Iniciando AnyDesk
+        shell: powershell
+        run: |
+          if (Test-Path "start.bat") {
+            Write-Host "Iniciando AnyDesk via start.bat..."
+            Start-Process -FilePath "cmd.exe" -ArgumentList "/c start.bat" -NoNewWindow
+          } else {
+            Write-Warning "Arquivo start.bat não encontrado. Verifique a configuração."
+          }
+
+      - name: Monitoramento Contínuo (AnyDesk)
+        shell: powershell
+        run: |
+          # Mantém a máquina ativa e verifica o AnyDesk a cada 5 minutos por até 6 horas (72 ciclos)
+          $ciclos = 72
+          for ($i = 1; $i -le $ciclos; $i++) {
+            $process = Get-Process -Name "AnyDesk" -ErrorAction SilentlyContinue
+            if (-not $process) {
+              Write-Host "[$i/$ciclos] AnyDesk não está rodando. Reiniciando..."
+              if (Test-Path "start.bat") {
+                Start-Process -FilePath "cmd.exe" -ArgumentList "/c start.bat" -NoNewWindow
+              }
+            } else {
+              Write-Host "[$i/$ciclos] AnyDesk ativo e rodando normalmente."
+            }
+            Start-Sleep -Seconds 300
+          }
+
+      - name: Limpeza de Arquivos Temporários
+        if: always()  # Garante a limpeza mesmo se o tempo acabar ou houver cancelamento
+        shell: powershell
+        run: |
+          if (Test-Path "Downloads.bat") {
+            Remove-Item "Downloads.bat" -Force
+            Write-Host "Arquivos temporários removidos com sucesso."
+          }
